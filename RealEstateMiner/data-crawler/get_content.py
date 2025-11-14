@@ -3,6 +3,7 @@ import os
 from base import Base
 from bs4 import BeautifulSoup
 import re
+import json
 import pandas as pd
 
 class GetPageContent(Base):
@@ -10,15 +11,13 @@ class GetPageContent(Base):
     def __init__(self, *args ,**kwargs):
         super().__init__(*args, **kwargs)
 
-    def load_urls(self, country_code):
-        file_name = f'{country_code}-advertise-urls.txt'
-        path = os.path.join(os.getcwd(), '../data/raw/', file_name)
-        print(path)
-        if not os.path.exists(path):
+    def load_urls(self, file_name):
+        self.path = os.path.join(os.getcwd(), '../data/raw/', file_name)
+        if not os.path.exists(self.path):
             print("Please get links first...!")
             exit()
 
-        with open(path, 'r') as file:
+        with open(self.path, 'r') as file:
             urls = file.read()
             self.urls = urls.split('\n')
     
@@ -34,9 +33,8 @@ class GetPageContent(Base):
 
     @property
     def property_type(self):
-        tag = self.soup.find(text=re.compile(r'(Unit|House|Apartment|Villa|Townhouse)', re.I))
-        tag = tag.split(",")
-        return tag if tag else None
+        tag = self.soup.select_one("div.sc-12iqlu8-2")
+        return tag.get_text(strip=True) if tag else None
 
     @property
     def price_aud(self):
@@ -50,44 +48,58 @@ class GetPageContent(Base):
 
     @property
     def published_date(self):
-        tag = self.soup.find('span', class_='property-published-date')
+        tag = self.soup.select_one('div.data > div')
         return tag.get_text(strip=True) if tag else None
 
     @property
     def last_update_date(self):
-        tag = self.soup.find('span', class_='property-last-updated')
-        return tag.get_text(strip=True) if tag else None
+        tag = self.soup.select_one('div.data > div')
+        try:
+            second_div = tag.find_next_sibling('div')
+        except:
+            second_div = None
+        return second_div.get_text(strip=True) if second_div else None
 
     @property
     def building_size(self):
-        tag = self.soup.find(text=re.compile(r'\d+\s*m²|\d+\s*sq\.ft', re.I))
-        return tag.strip() if tag else None
+        tag = self.soup.select_one("div.sc-12iqlu8-2 > span")
+        return tag.get_text(strip=True) if tag else None
 
     @property
     def bedrooms(self):
-        tag = self.soup.find(text=re.compile(r'\d+\s*bed', re.I))
-        return tag.strip() if tag else None
+        tag = self.soup.select_one("div.rooms > div.sc-12iqlu8-2")
+        if tag and (text := tag.get_text(strip=True)):
+            try:
+                bedroom_text = text.split(",")[0].strip()
+                return bedroom_text
+            except:
+                return None
+        return None
 
     @property
     def bathrooms(self):
-        tag = self.soup.find(text=re.compile(r'\d+\s*bath', re.I))
-        return tag.strip() if tag else None
+        tag = self.soup.select_one("div.rooms > div.sc-12iqlu8-2")
+        if tag and (text := tag.get_text(strip=True)):
+            bedroom_text = text.split(",")[1].strip()
+            return bedroom_text
+        return None
 
     @property
     def parking_spaces(self):
-        tag = self.soup.find(text=re.compile(r'\d+\s*parking', re.I))
-        return tag.strip() if tag else None
+        tag = self.soup.select_one("div.parkingSpaces > div.sc-12iqlu8-2")
+        if tag and (text := tag.get_text(strip=True)):
+            spaces = text.split(",")[0].strip()
+            return spaces
+        return None
 
     # ---------------- Features ----------------
     @property
-    def indoor_features(self):
-        tags = self.soup.select('.indoor-features li')
-        return [t.get_text(strip=True) for t in tags] if tags else None
-
-    @property
-    def outdoor_features(self):
-        tags = self.soup.select('.outdoor-features li')
-        return [t.get_text(strip=True) for t in tags] if tags else None
+    def features(self):
+        feature_tags = self.soup.select('div.feature > span')
+        if not feature_tags:
+            return None
+        feature_list = [f.get_text(strip=True) for f in feature_tags if f.get_text(strip=True)]
+        return feature_list if feature_list else None
 
     # ---------------- Agent info ----------------
     @property
@@ -154,44 +166,40 @@ class GetPageContent(Base):
             'bedrooms': self.bedrooms,
             'bathrooms': self.bathrooms,
             'parkingSpaces': self.parking_spaces,
-            'indoorFeatures': self.indoor_features,
-            'outdoorFeatures': self.outdoor_features,
+            'features': self.features,
             'agentName': self.agent_name,
             'agency': self.agency,
             'agentPhone': self.agent_phone,
             'agentEmail': self.agent_email,
             'description': self.description,
-            'images': self.images,
-            'similarProperties': self.similar_properties
         }
 
 
     def fetch_content(self, storage=True):
-        self.load_urls(country_code=self.country_code)
-        i = 0
+        self.load_urls(file_name=self.fetch_contents)
+        all_data = []
+        print(f"Start Crawling {len(self.urls)} URL")
+        
         for url in self.urls:
-            self.url = url
-            html = self.get_html
-            if html is None:
+            try:
+                self.url = url
+                html = self.get_html
+                if html is None:
+                    continue
+
+                self.soup = BeautifulSoup(html, 'html.parser')
+                data = self.get_all_data()
+                
+                for key, value in data.items():
+                    if isinstance(value, list) or isinstance(value, dict):
+                        data[key] = json.dumps(value)  
+                    elif value is None:
+                        data[key] = None
+                all_data.append(data)
+            except:
                 continue
-
-            self.soup = BeautifulSoup(html, 'html.parser')
-            all_data = self.get_all_data()
-            import pprint
-            # pprint.pprint(all_data)
-            # df = pd.DataFrame(all_data)
-            # print(df)
-            for key, value in all_data.items():
-                print(key)
-                print("\n")
-                print(value)
-                print("-"*50)
-            input("Enter")
-            # df = pd.DataFrame(all_data)
-            # print(df)
-            print("-"*10)
-            i +=1
-            if i == 3:
-                break
-
+            
+        df = pd.DataFrame(all_data, columns=data.keys())
+        path = self.path[:-4] + '.csv'
+        df.to_csv(path, index=False)
 

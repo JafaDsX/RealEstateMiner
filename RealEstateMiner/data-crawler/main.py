@@ -33,8 +33,7 @@ class Main(GetPageURLs, GetPageContent, Storage):
         parser.add_argument(
             '-fc', '--fetch-contents',
             help='Get All Advertising Contents',
-            action='store_true',
-            default=False
+            type=str,
         )
         parser.add_argument(
             '-c', '--country',
@@ -63,7 +62,7 @@ class Main(GetPageURLs, GetPageContent, Storage):
 
         self.country_code = self.country_to_code
 
-        if self.country_code is None:
+        if self.fetch_urls is None and self.country_code is None:
             print(f"Invalid Country Name: {self.country}")
             exit()
 
