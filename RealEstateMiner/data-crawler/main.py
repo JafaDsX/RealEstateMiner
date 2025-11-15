@@ -17,7 +17,8 @@ class Main(GetPageURLs, GetPageContent, Storage):
             country = pycountry.countries.lookup(self.country)
             return country.alpha_2
         except:
-            return None
+            print("Country Name Not Found!")
+            exit()
     
     @property
     def get_user_arguments(self):
@@ -33,7 +34,8 @@ class Main(GetPageURLs, GetPageContent, Storage):
         parser.add_argument(
             '-fc', '--fetch-contents',
             help='Get All Advertising Contents',
-            type=str,
+            action='store_true',
+            default=False
         )
         parser.add_argument(
             '-c', '--country',
@@ -53,6 +55,33 @@ class Main(GetPageURLs, GetPageContent, Storage):
             action='store_true',
             default=True
         )
+        parser.add_argument(
+            '-dl', '--dead-links',
+            help='Check all URLs and save those that return a 404 (dead) response.',
+            default=True,
+        )
+
+        # TODO:
+        parser.add_argument(
+            '-cd', '--crawl-dead',
+            help='Crawl all previously saved dead links to check their status or fetch content.',
+            action='store_true',
+            default=False
+        )
+
+        # TODO: update all urls ith this method
+        parser.add_argument(
+            '-uu', '--update-urls',
+            action='store_true',
+            default=False
+        )
+
+        # TODO: update contents needs to update
+        parser.add_argument(
+            '-uc', '--update-contents',
+            action='store_true',
+            default=False
+        )
 
         self.fetch_urls = parser.parse_args().fetch_urls
         self.fetch_contents = parser.parse_args().fetch_contents
@@ -71,8 +100,11 @@ class Main(GetPageURLs, GetPageContent, Storage):
         
         if not self.storage:
             print("Storage is false. Are you sure? y/n")
-            input("/> ")
-        
+            user_choice = input("/> ")
+            if user_choice.lower().strip() == 'y':
+                pass
+            else:
+                exit()
 
     def run(self):
         self.get_user_arguments

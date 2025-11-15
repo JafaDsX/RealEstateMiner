@@ -12,7 +12,7 @@ class GetPageContent(Base):
         super().__init__(*args, **kwargs)
 
     def load_urls(self, file_name):
-        self.path = os.path.join(os.getcwd(), '../data/raw/', file_name)
+        self.path = os.path.join(os.getcwd(), '../data/raw/', self.country_code+'-advertise-urls.txt')
         if not os.path.exists(self.path):
             print("Please get links first...!")
             exit()
@@ -180,7 +180,8 @@ class GetPageContent(Base):
         all_data = []
         print(f"Start Crawling {len(self.urls)} URL")
         
-        for url in self.urls:
+        for i, url in enumerate(self.urls):
+            self.print(f'[{i}] - {url}')
             try:
                 self.url = url
                 html = self.get_html
@@ -201,5 +202,7 @@ class GetPageContent(Base):
             
         df = pd.DataFrame(all_data, columns=data.keys())
         path = self.path[:-4] + '.csv'
-        df.to_csv(path, index=False)
+
+        if storage:
+            df.to_csv(path, index=False)
 
